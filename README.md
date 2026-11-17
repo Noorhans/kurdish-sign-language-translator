@@ -2,7 +2,7 @@
 
 **Project page:** https://noorhans.github.io/kurdish-sign-language-translator/
 
-![The translator in dark mode](docs/img/app-dark.jpg)
+![The translator](docs/img/app-light.jpg)
 
 Team: Noorhan Salah Hassan · Vare Latif — Supervisor: Dr. Jaza Faeq — Computer Engineering, University of Sulaimani.
 
@@ -54,34 +54,33 @@ It prints which phrases it trains on and saves `model/report.txt` (accuracy per 
 ## 4. Run the translator
 
 ```bash
-python app.py                 # dark theme, live camera
-python app.py --theme light   # start in light mode
+python app.py                 # light mode
+python app.py --theme dark    # start in dark mode
 ```
 
-Everything works with the **mouse** (buttons along the bottom) or the **keyboard**:
+It looks and works like an everyday app: the camera picture on the left, the detected sign on
+the right, your words underneath, and big buttons to click.
 
-| Button | Key | What it does |
+| On screen | Key | What it does |
 |---|---|---|
-| Sentence | ENTER | Turn the recognised words into one Kurdish sentence |
-| Undo word | BACKSPACE | Remove the last word |
-| Clear all | C | Start over |
-| Show / Hide tracking | V | Draw the body + hand tracking lines on the video (off by default) |
-| Light / Dark mode | T | Switch theme |
-| Fullscreen | F | Fullscreen on/off (great on a big exhibition screen) |
-| Quit | Q | Close the app |
+| **Make sentence** | ENTER | Turn your words into one Kurdish sentence |
+| **Undo** | BACKSPACE | Remove the last word |
+| **Clear all** | C | Start over |
+| **Show / Hide tracking** (top right) | V | Draw the tracking points on the video (hidden by default) |
+| **Dark / Light mode** (top right) | T | Switch theme |
+| **Full screen** (top right) | F | Great on a big exhibition screen |
+| | Q | Quit |
 
-Extra keys: `+` / `-` sensitivity, `E` show/hide English.
+Extra keys: `+` / `-` make recognition stricter / more relaxed, `E` show/hide English.
 
-Too many wrong words → press `+`. Missing real signs → press `-`.
-
-**Sentences:** with an Anthropic API key set, Sentence asks Claude to rewrite the signed words as one
-natural Sorani sentence; without a key (or offline) it just joins the words.
+**Sentences:** with an Anthropic API key set, Make sentence asks Claude to rewrite the signed words as
+one natural Sorani sentence; without a key (or offline) it just joins the words.
 
 ```bash
 set ANTHROPIC_API_KEY=sk-ant-...      # Windows   (macOS/Linux: export ANTHROPIC_API_KEY=...)
 ```
 
-The camera picture is shown whole and as-is (nothing cropped, nothing drawn on the person); the tracking runs in the background. Nothing is ever saved.
+The camera picture is shown whole and as-is; nothing is ever saved.
 
 ## Recording more (optional)
 
@@ -97,7 +96,7 @@ them in `phrases.txt`, record them, and train again.
 ## Exhibition tips
 
 - Same kind of lighting as when you recorded; a plain background behind the signer helps.
-- Stand so your hands and shoulders are in view (the **BODY OK** tag shows when they are).
+- Stand so your hands and shoulders are in view.
 - Make one sign, then rest your hands so it counts as one word.
 - Use **Fullscreen** and an external monitor; keep a backup video of the app working.
 
@@ -115,5 +114,6 @@ them in `phrases.txt`, record them, and train again.
 | `collect.py` | Record training samples |
 | `train.py` | Train + accuracy report |
 | `app.py` | Live translator |
+| `friendly.py` | The translator's look (rounded cards, light/dark themes) |
 | `common.py` | Landmarks, normalisation, Kurdish text |
-| `ui.py` | Themes, panels, buttons, camera view |
+| `ui.py` | The recorder's screen |

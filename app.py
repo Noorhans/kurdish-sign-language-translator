@@ -1,23 +1,21 @@
 """Live Kurdish Sign Language -> Kurdish text translator.
 
 Usage:
-    python app.py                          # webcam 0, dark theme, camera view
-    python app.py --theme light            # start in light mode
-    python app.py --view tracking          # start with the tracking lines drawn on the video
-    python app.py --camera 1 --threshold 0.8
+    python app.py                    # light theme
+    python app.py --theme dark
+    python app.py --camera 1
 
-Everything can be done with the mouse (buttons at the bottom) or the keyboard:
-    ENTER      turn the recognised signs into a full Kurdish sentence
-    BACKSPACE  remove the last word
-    C          clear the transcript
-    V          show / hide the tracking lines on the video (hidden by default)
-    T          switch theme: dark <-> light
-    F          fullscreen on/off
-    + / -      raise / lower the confidence threshold
-    E          show / hide English
+Everything works with the mouse. Keyboard shortcuts too:
+    ENTER      make a sentence from your words
+    BACKSPACE  undo the last word
+    C          clear all
+    V          show / hide the tracking points on the video
+    T          light / dark mode
+    F          full screen
+    + / -      stricter / more relaxed recognition
     Q / ESC    quit
 
-The camera picture is shown as-is and never saved; tracking runs in the background.
+The camera picture is shown whole and as-is, and never saved.
 Sentence building uses Claude if ANTHROPIC_API_KEY is set; otherwise words are just joined.
 """
 import argparse
@@ -30,13 +28,13 @@ import cv2
 
 from common import (SEQ_LEN, IDLE_ID, MODEL_DIR, load_labels, make_holistic, run_holistic,
                     frame_features)
-import ui
-from ui import T
+import friendly as fx
+from friendly import T
 
 W, H = 1280, 720
-VX, VY, VW, VH = 24, 78, 800, 450          # camera viewport (16:9)
-RX, RW = 848, 408                          # right column
-TY, SY, BY = 544, 614, 672                 # transcript, sentence, buttons rows
+CX, CY, CW, CH = 24, 80, 832, 468          # camera
+WX, WY, WW, WH = 24, 564, 832, 140         # your words
+RX, RW = 880, 376                          # right column
 
 SENTENCE_MODEL = "claude-haiku-5-5"
 
@@ -125,176 +123,150 @@ def build_sentence(words, out):
     out["busy"] = False
 
 
+
+
 # ------------------------------------------------------------------------------ screen
-BUTTONS = [  # action, key label
-    ("sentence", "ENTER"), ("undo", "BKSP"), ("clear", "C"), ("view", "V"),
-    ("theme", "T"), ("full", "F"), ("quit", "Q"),
-]
-
-
-def button_label(action, s):
-    return {
-        "sentence": "Sentence",
-        "undo": "Undo word",
-        "clear": "Clear all",
-        "view": "Show tracking" if s["view"] == "camera" else "Hide tracking",
-        "theme": "Light mode" if T.dark else "Dark mode",
-        "full": "Exit fullscreen" if s["full"] else "Fullscreen",
-        "quit": "Quit",
-    }[action]
-
-
-def draw_ui(img, frame, res, hands_now, rec, labels, words, sentence, fps, s, last_hit):
-    """Draws one full frame of the translator. `s` is the UI state dict."""
-    p = ui.Painter(img)
+def draw_ui(img, frame, res, hands_now, rec, labels, words, sentence, s, last_hit):
+    """Draws one frame. Returns {action: rect} for every clickable button."""
     now = time.time()
-    flash = now - last_hit < 1.6
+    flash = now - last_hit < 1.8
+    rects = {}
+    hov = lambda r: fx.inside(s["mouse"], r)
+
+    img[:] = T.bgr("bg")
+    fx.camera(img, frame, res, CX, CY, CW, CH, show_tracking=s["tracking"])
+    c = fx.Canvas(img)
 
     # ---- top bar
-    p.text("KSL", (24, 17), 24, T.cyan, mono=True, bold=True)
-    p.text("// TRANSLATOR", (76, 22), 17, T.text, mono=True, bold=True)
-    p.text("AI · COMPUTER VISION", (248, 25), 12, T.muted, mono=True)
-    p.text("وەرگێڕی زمانی ئاماژەی کوردی", (W - 24, 14), 24, T.text, "ra")
-    cv2.line(img, (0, 62), (W, 62), T.line, 1)
+    c.circle(44, 40, 20, T.accent)
+    c.text("KS", (44, 40), 15, T.on_accent, "mm", bold=True)
+    c.text("Sign Translator", (76, 30), 22, T.text, "lm", bold=True)
+    c.text("وەرگێڕی زمانی ئاماژەی کوردی", (76, 56), 14, T.muted, "lm")
+    x = W - 24
+    for action, label in (("full", "Exit full screen" if s["full"] else "Full screen"),
+                          ("theme", "Dark mode" if not T.dark else "Light mode"),
+                          ("tracking", "Hide tracking" if s["tracking"] else "Show tracking")):
+        bw = fx.text_width(label, 15, True) + 36
+        x -= bw
+        r = (x, 18, bw, 40)
+        rects[action] = fx.button(c, *r, label, "ghost", hov(r), size=15)
+        x -= 10
+
+    # ---- status chip on the video
     if sentence["busy"]:
-        state, col = "GENERATING SENTENCE", T.cyan
+        st, col, ku = "Making your sentence…", T.accent, ""
     elif flash:
-        state, col = "SIGN RECOGNIZED", T.green
+        st, col, ku = "Got it!", T.green, ""
     elif hands_now:
-        state, col = "READING YOUR SIGN", T.amber
+        st, col, ku = "Reading your sign…", T.amber, ""
     else:
-        state, col = "RAISE YOUR HANDS", T.muted
-    ui.pill(img, p, 640 - p.width(state, 14, True, True) / 2 - 20, 16, state, col)
+        st, col, ku = "Raise your hands to start", T.muted, "دەستەکانت بەرز بکەرەوە"
+    tw = fx.text_width(st, 16, True) + (fx.text_width(ku, 16) + 18 if ku else 0)
+    c.box(CX + 16, CY + 16, tw + 52, 42, T.card, radius=21)
+    c.circle(CX + 38, CY + 37, 6, col)
+    c.text(st, (CX + 54, CY + 37), 16, T.text, "lm", bold=True)
+    if ku:
+        c.text(ku, (CX + 54 + fx.text_width(st, 16, True) + 18, CY + 37), 16, T.muted, "lm")
 
-    # ---- camera viewport
-    frame_col = T.green if flash else (T.amber if hands_now else T.cyan)
-    label = "LIVE CAMERA" if s["view"] == "camera" else "LIVE CAMERA + TRACKING"
-    n, body = ui.viewport(img, p, res, frame, VX, VY, VW, VH, s["view"], frame_col, label)
-    stat = f"HANDS {n}/2   BODY {'OK' if body else '--'}"
-    sw = p.width(stat, 13, True, True)
-    ui.blend_rect(img, VX + 8, VY + VH - 34, sw + 20, 26, T.bg, 0.7)
-    p.text(stat, (VX + 18, VY + VH - 21), 13, T.green if n else T.muted, "lm", mono=True, bold=True)
-    fps_t = f"{fps:4.1f} FPS"
-    fw_ = p.width(fps_t, 13, True)
-    ui.blend_rect(img, VX + VW - fw_ - 28, VY + 8, fw_ + 20, 26, T.bg, 0.7)
-    p.text(fps_t, (VX + VW - 18, VY + 21), 13, T.muted, "rm", mono=True)
+    # ---- subtitle on the video
+    if flash and rec.last_word is not None:
+        wd = labels[rec.last_word]
+        bw = max(fx.text_width(wd["ku"], 40, True), fx.text_width(wd["en"], 16)) + 72
+        bh = 96 if (s["en"] and wd["en"]) else 72
+        bx, by = CX + CW / 2 - bw / 2, CY + CH - bh - 20
+        c.box(bx, by, bw, bh, (0, 0, 0), radius=20, alpha=0.62)
+        c.text(wd["ku"], (CX + CW / 2, by + 36), 40, (255, 255, 255), "mm", bold=True)
+        if s["en"] and wd["en"]:
+            c.text(wd["en"], (CX + CW / 2, by + 74), 16, (209, 213, 219), "mm")
 
-    if not hands_now and not flash:                    # small hint at the top, never over the person
-        ui.blend_rect(img, VX + VW / 2 - 200, VY + 44, 400, 64, T.bg, 0.6)
-        p.text("دەستەکانت بەرز بکەرەوە", (VX + VW / 2, VY + 64), 24, T.text, "mm")
-        p.text("Raise your hands to start signing", (VX + VW / 2, VY + 94), 13,
-               T.muted, "mm", mono=True)
-    if flash and rec.last_word is not None:            # TV-style subtitle
-        word = labels[rec.last_word]
-        tw = max(p.width(word["ku"], 40), 220) + 60
-        sx = VX + VW / 2 - tw / 2
-        ui.blend_rect(img, sx, VY + VH - 96, tw, 82, T.bg, 0.6)
-        cv2.line(img, (int(sx), VY + VH - 96), (int(sx + tw), VY + VH - 96), T.green, 2)
-        p.text(word["ku"], (VX + VW / 2, VY + VH - 64), 40, T.green, "mm")
-        if s["en"] and word["en"]:
-            p.text(word["en"].upper(), (VX + VW / 2, VY + VH - 28), 13, T.text, "mm", mono=True)
+    # ---- toast
+    if s["toast"] and now - s["toast"][1] < 1.6:
+        t = s["toast"][0]
+        bw = fx.text_width(t, 15, True) + 40
+        c.box(CX + CW / 2 - bw / 2, CY + 16, bw, 40, (17, 24, 39), radius=20, alpha=0.8)
+        c.text(t, (CX + CW / 2, CY + 36), 15, (255, 255, 255), "mm", bold=True)
 
-    # ---- detected sign
-    ui.panel(img, p, RX, VY, RW, 200, "DETECTED SIGN", right_note=f"SENSITIVITY {rec.threshold:.2f}")
+    # ---- detected sign card
+    y = CY
+    c.box(RX, y, RW, 280, T.card, radius=20, outline=T.border)
+    c.text("Detected sign", (RX + 24, y + 22), 15, T.muted, bold=True)
     order = [int(i) for i in np.argsort(rec.probs)[::-1]
              if rec.probs[i] > 0.01 and labels[i]["id"] != IDLE_ID]
-    top_p = float(rec.probs[order[0]]) if order else 0.0
     if flash and rec.last_word is not None:
-        big, big_en, big_p, big_col, conf_label = (labels[rec.last_word]["ku"], labels[rec.last_word]["en"],
-                                                   1.0, T.green, "ACCEPTED")
+        idx, p, col, note = rec.last_word, 1.0, T.green, "Got it"
     elif order and hands_now:
-        i = order[0]
-        ok = top_p >= rec.threshold
-        big, big_en, big_p, big_col = labels[i]["ku"], labels[i]["en"], top_p, (T.green if ok else T.text)
-        conf_label = f"CONFIDENCE {top_p * 100:.0f}%"
+        idx = order[0]
+        p = float(rec.probs[idx])
+        ok = p >= rec.threshold
+        col, note = (T.green if ok else T.accent), f"{p * 100:.0f}% sure"
     else:
-        big, big_en, big_p, big_col, conf_label = "", "", 0.0, T.text, "WAITING FOR A SIGN"
-    if big:
-        p.text(big, (RX + RW - 22, VY + 42), 48, big_col, "ra")
-        if s["en"] and big_en:
-            p.text(big_en.upper(), (RX + RW - 22, VY + 112), 14, T.muted, "ra", mono=True)
+        idx, p, col, note = None, 0.0, T.accent, ""
+    if idx is not None:
+        ku, size = labels[idx]["ku"], 50
+        while size > 24 and fx.text_width(ku, size, True) > RW - 48:
+            size -= 2
+        c.text(ku, (RX + RW / 2, y + 116), size, T.text, "mm", bold=True)
+        if s["en"] and labels[idx]["en"]:
+            c.text(labels[idx]["en"], (RX + RW / 2, y + 172), 18, T.muted, "mm")
     else:
-        p.text("— — —", (RX + RW / 2, VY + 84), 30, T.dim, "mm", mono=True)
-    p.text(conf_label, (RX + 22, VY + 150), 13, big_col if big else T.muted, mono=True, bold=True)
-    ui.bar(img, RX + 22, VY + 174, RW - 44, 8, big_p, big_col if big else T.dim, marker=rec.threshold)
+        c.text("Waiting for a sign", (RX + RW / 2, y + 128), 20, T.muted, "mm")
+    c.box(RX + 24, y + 222, RW - 48, 10, T.soft, radius=5)
+    if p > 0:
+        c.box(RX + 24, y + 222, max(10, (RW - 48) * min(p, 1.0)), 10, col, radius=5)
+    c.text(note, (RX + 24, y + 252), 15, col if note == "Got it" else T.muted, "lm", bold=note == "Got it")
 
-    # ---- other guesses
-    gy = VY + 212
-    ui.panel(img, p, RX, gy, RW, 110, "OTHER GUESSES")
-    alts = order[1:4] if (order and hands_now and not flash) else []
-    for k in range(3):
-        y = gy + 42 + k * 24
-        if k < len(alts):
-            i = alts[k]
-            pr = float(rec.probs[i])
-            ui.bar(img, RX + 22, y - 2, 110, 4, pr, T.cyan)
-            p.text(f"{pr * 100:3.0f}%", (RX + 144, y), 12, T.muted, "lm", mono=True)
-            p.text(labels[i]["ku"], (RX + RW - 22, y), 19, T.text, "rm")
-        else:
-            cv2.line(img, (RX + 22, y), (RX + RW - 22, y), T.line, 1)
+    # ---- how it works card
+    y = CY + 296
+    c.box(RX, y, RW, 172, T.card, radius=20, outline=T.border)
+    c.text("How it works", (RX + 24, y + 22), 15, T.muted, bold=True)
+    for k, t in enumerate(("Raise your hands into view",
+                           "Make one sign, then rest",
+                           "Press Make sentence")):
+        sy = y + 70 + k * 36
+        c.circle(RX + 38, sy, 13, T.accent_soft)
+        c.text(str(k + 1), (RX + 38, sy), 14, T.accent, "mm", bold=True)
+        c.text(t, (RX + 62, sy), 17, T.text, "lm")
 
-    # ---- how to use
-    hy = gy + 122
-    ui.panel(img, p, RX, hy, RW, VY + VH - hy, "HOW TO USE", accent=T.amber)
-    steps = ["Raise your hands into the camera",
-             "Make one sign, then rest your hands",
-             "The word appears as a subtitle",
-             "Press  Sentence  to finish"]
-    for k, t in enumerate(steps):
-        y = hy + 40 + k * 21
-        ui.dot(img, RX + 30, y, 9, T.amber, ring=True)
-        p.text(str(k + 1), (RX + 30, y), 11, T.amber, "mm", mono=True, bold=True)
-        p.text(t, (RX + 48, y), 14, T.text, "lm")
+    # ---- buttons
+    r = (RX, WY, RW, 60)
+    rects["sentence"] = fx.button(c, *r, "Make sentence", "primary" if words else "disabled",
+                                  hov(r) and bool(words), size=18)
+    half = (RW - 12) / 2
+    r = (RX, WY + 76, half, 64)
+    rects["undo"] = fx.button(c, *r, "Undo", "ghost", hov(r))
+    r = (RX + half + 12, WY + 76, half, 64)
+    rects["clear"] = fx.button(c, *r, "Clear all", "ghost", hov(r))
 
-    # ---- transcript
-    ui.panel(img, p, VX, TY, W - 48, 62, "TRANSCRIPT", accent=T.green,
-             right_note=f"{len(words)} WORD{'S' if len(words) != 1 else ''}")
-    avail, used, keep = (W - 40) - (VX + 130), 0, []
-    for j in range(len(words) - 1, -1, -1):          # Kurdish reads right-to-left
-        txt = labels[words[j]]["ku"]
-        w = p.width(txt, 22) + 28
-        if used + w > avail:
-            break
-        keep.insert(0, (j, txt, w))
-        used += w + 10
-    xr = W - 40
-    for j, txt, w in keep:
-        x0 = xr - w
-        newest = j == len(words) - 1
-        col = T.green if (newest and flash) else (T.cyan if newest else T.dim)
-        if newest and flash:
-            ui.blend_rect(img, x0, TY + 26, w, 30, T.green, 0.15)
-        else:
-            ui.rect(img, x0, TY + 26, w, 30, T.panel2)
-        ui.rect(img, x0, TY + 26, w, 30, col, 1)
-        p.text(txt, (x0 + w / 2, TY + 40), 22, T.text, "mm")
-        xr -= w + 10
+    # ---- your words card
+    c.box(WX, WY, WW, WH, T.card, radius=20, outline=T.border)
+    c.text("Your words", (WX + 24, WY + 20), 15, T.muted, bold=True)
+    if words:
+        c.text(f"{len(words)} word{'s' if len(words) != 1 else ''}", (WX + WW - 24, WY + 20), 15, T.muted, "ra")
     if not words:
-        p.text("your signs will appear here", (W - 40, TY + 41), 14, T.dim, "rm", mono=True)
-    if len(keep) < len(words):
-        p.text(f"+{len(words) - len(keep)}", (VX + 20, TY + 41), 14, T.muted, "lm", mono=True)
-
-    # ---- sentence
-    ui.panel(img, p, VX, SY, W - 48, 50, "SENTENCE", accent=T.cyan)
-    if sentence["busy"]:
-        a = ui.pulse(6)
-        p.text("GENERATING" + "." * int(now * 3 % 4), (W - 40, SY + 27), 15,
-               tuple(int(c * (0.5 + 0.5 * a)) for c in T.cyan), "rm", mono=True, bold=True)
-    elif sentence["text"]:
-        p.text(sentence["text"], (W - 40, SY + 26), 26, T.green, "rm")
+        c.text("The signs you make will appear here", (WX + 24, WY + 74), 18, T.muted, "lm")
     else:
-        p.text("press  Sentence  to join the words into a Kurdish sentence",
-               (W - 40, SY + 28), 14, T.dim, "rm", mono=True)
-
-    # ---- buttons (clickable)
-    rects = {}
-    bw = (W - 48 - 10 * (len(BUTTONS) - 1)) / len(BUTTONS)
-    for k, (action, key) in enumerate(BUTTONS):
-        bx = VX + k * (bw + 10)
-        r = (bx, BY, bw, 40)
-        rects[action] = ui.button(img, p, bx, BY, bw, 40, button_label(action, s), key,
-                                  hover=ui.inside(s["mouse"], r), primary=(action == "sentence" and bool(words)))
-    p.flush()
+        avail, used, keep = WW - 48, 0, []
+        for j in range(len(words) - 1, -1, -1):        # Kurdish reads right-to-left
+            t = labels[words[j]]["ku"]
+            bw = fx.text_width(t, 20, True) + 32
+            if used + bw > avail:
+                break
+            keep.insert(0, (j, t, bw))
+            used += bw + 8
+        xr = WX + WW - 24
+        for j, t, bw in keep:
+            newest = j == len(words) - 1
+            fill = T.green_soft if (newest and flash) else T.soft
+            c.box(xr - bw, WY + 48, bw, 40, fill, radius=20)
+            c.text(t, (xr - bw / 2, WY + 68), 20, T.green if (newest and flash) else T.text, "mm", bold=True)
+            xr -= bw + 8
+        if sentence["busy"]:
+            c.text("Making your sentence…", (WX + WW - 24, WY + 114), 17, T.muted, "rm")
+        elif sentence["text"]:
+            c.text(sentence["text"], (WX + WW - 24, WY + 112), 24, T.accent, "rm", bold=True)
+        else:
+            c.text("Press Make sentence to turn your words into a sentence", (WX + 24, WY + 114), 15, T.muted, "lm")
+    c.finish()
     return rects
 
 
@@ -302,28 +274,30 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--camera", type=int, default=0)
     ap.add_argument("--threshold", type=float, default=0.7)
-    ap.add_argument("--theme", choices=["dark", "light"], default="dark")
-    ap.add_argument("--view", choices=["camera", "tracking"], default="camera")
+    ap.add_argument("--theme", choices=["light", "dark"], default="light")
     args = ap.parse_args()
     T.set(args.theme)
 
     import tensorflow as tf
-    model = tf.keras.models.load_model(os.path.join(MODEL_DIR, "ksl_model.keras"))
+    path = os.path.join(MODEL_DIR, "ksl_model.keras")
+    if not os.path.exists(path):
+        raise SystemExit("No trained model yet. Run:  python train.py")
+    model = tf.keras.models.load_model(path)
     labels = load_labels()
     rec = Recogniser(model, labels, threshold=args.threshold)
     rec.model(np.zeros((1, SEQ_LEN, model.input_shape[-1]), np.float32))   # warm-up
 
     cap = cv2.VideoCapture(args.camera)
     if not cap.isOpened():
-        raise SystemExit("Could not open the webcam. Try --camera 1")
+        raise SystemExit("Could not open the webcam. Try:  python app.py --camera 1")
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
     tracker = make_holistic()
-    win = "KSL Translator"
+    win = "Sign Translator"
     cv2.namedWindow(win, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(win, W, H)
 
-    s = {"view": args.view, "en": True, "full": False, "mouse": None, "click": None}
+    s = {"tracking": False, "en": True, "full": False, "mouse": None, "click": None, "toast": None}
 
     def on_mouse(event, x, y, flags, param):
         s["mouse"] = (x, y)
@@ -333,10 +307,11 @@ def main():
 
     words, sentence = [], {"text": "", "busy": False}
     last_hit = 0.0
-    t_prev, fps = time.time(), 0.0
+
+    def toast(t):
+        s["toast"] = (t, time.time())
 
     def do(action):
-        nonlocal words
         if action == "sentence" and words and not sentence["busy"]:
             sentence.update(text="", busy=True)
             threading.Thread(target=build_sentence,
@@ -345,8 +320,9 @@ def main():
             words.pop(); sentence["text"] = ""
         elif action == "clear":
             words.clear(); sentence["text"] = ""; rec.reset_window()
-        elif action == "view":
-            s["view"] = "tracking" if s["view"] == "camera" else "camera"
+        elif action == "tracking":
+            s["tracking"] = not s["tracking"]
+            toast("Tracking shown" if s["tracking"] else "Tracking hidden")
         elif action == "theme":
             T.toggle()
         elif action == "full":
@@ -358,10 +334,11 @@ def main():
         return True
 
     keymap = {13: "sentence", 10: "sentence", 8: "undo", 127: "undo", 27: "quit",
-              ord("c"): "clear", ord("C"): "clear", ord("v"): "view", ord("V"): "view",
+              ord("c"): "clear", ord("C"): "clear", ord("v"): "tracking", ord("V"): "tracking",
               ord("t"): "theme", ord("T"): "theme", ord("f"): "full", ord("F"): "full",
               ord("q"): "quit", ord("Q"): "quit"}
 
+    canvas = np.zeros((H, W, 3), np.uint8)
     running = True
     while running:
         ok, frame = cap.read()
@@ -377,15 +354,12 @@ def main():
             last_hit = time.time()
             print("+", labels[hit]["id"], labels[hit]["ku"])
 
-        canvas = np.full((H, W, 3), T.bg, np.uint8)
-        now = time.time()
-        fps = 0.9 * fps + 0.1 / max(now - t_prev, 1e-3); t_prev = now
-        rects = draw_ui(canvas, frame, res, hands, rec, labels, words, sentence, fps, s, last_hit)
+        rects = draw_ui(canvas, frame, res, hands, rec, labels, words, sentence, s, last_hit)
         cv2.imshow(win, canvas)
 
         if s["click"] is not None:
             for action, r in rects.items():
-                if ui.inside(s["click"], r):
+                if fx.inside(s["click"], r):
                     running = do(action)
                     break
             s["click"] = None
@@ -395,11 +369,12 @@ def main():
             running = do(keymap[k]) and running
         elif k in (ord("+"), ord("=")):
             rec.threshold = min(0.99, rec.threshold + 0.05)
+            toast(f"Stricter recognition ({rec.threshold:.2f})")
         elif k in (ord("-"), ord("_")):
             rec.threshold = max(0.3, rec.threshold - 0.05)
+            toast(f"More relaxed recognition ({rec.threshold:.2f})")
         elif k in (ord("e"), ord("E")):
             s["en"] = not s["en"]
-        # closing the window with its X button also quits
         if cv2.getWindowProperty(win, cv2.WND_PROP_VISIBLE) < 1:
             break
 

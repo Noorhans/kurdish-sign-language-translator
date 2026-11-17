@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.venv/
+
+# Generated locally
+mp_models/
+model/
+
+# Recordings (personal data). Remove this line if you want to publish the dataset.
+data/*
+!data/.keep

@@ -1,0 +1,9 @@
+numpy
+opencv-python
+mediapipe>=0.10.14
+tensorflow>=2.16
+pillow
+arabic-reshaper
+python-bidi
+# optional: turns recognised words into a full Kurdish sentence (needs ANTHROPIC_API_KEY)
+anthropic

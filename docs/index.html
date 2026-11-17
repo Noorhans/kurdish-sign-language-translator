@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kurdish Sign Language AI Translator</title>
+<meta name="description" content="Real-time Kurdish Sign Language to written Kurdish, with a regular laptop webcam. MediaPipe + TensorFlow. University of Sulaimani, Computer Engineering.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Noto+Kufi+Arabic:wght@500;700&family=Noto+Sans+Arabic:wght@500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#070B10;--panel:#0D141C;--panel2:#132030;--line:#1C2A39;--text:#E6EDF3;--muted:#93A4B5;
+  --cyan:#22D3EE;--green:#34D399;--amber:#FBBF24;--on-accent:#04121A;--grid:#0F1922;
+}
+:root[data-theme="light"]{
+  --bg:#EEF3F7;--panel:#FFFFFF;--panel2:#F2F6FA;--line:#CBD6E1;--text:#0B1420;--muted:#4A5868;
+  --cyan:#007E9C;--green:#08875A;--amber:#B45F00;--on-accent:#FFFFFF;--grid:#DCE4EC;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,sans-serif;font-size:17px;line-height:1.6;transition:background .2s,color .2s}
+a{color:var(--cyan)}
+.wrap{max-width:1160px;margin:0 auto;padding:0 20px}
+.mono{font-family:'JetBrains Mono',monospace}
+.ku{font-family:'Noto Sans Arabic',sans-serif;direction:rtl}
+h1,h2,h3{font-family:'Space Grotesk',sans-serif;line-height:1.1;margin:0}
+section{padding:72px 0;border-top:1px solid var(--line)}
+.kicker{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;letter-spacing:.12em;color:var(--cyan);text-transform:uppercase}
+.sec-head{display:flex;flex-direction:column;gap:8px;margin-bottom:32px}
+.sec-head h2{font-size:clamp(30px,4vw,44px)}
+.sec-head p{margin:0;color:var(--muted);max-width:720px}
+
+/* nav */
+nav{position:sticky;top:0;z-index:10;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:20px;height:62px}
+.logo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:18px;color:var(--text);text-decoration:none;white-space:nowrap}
+.logo b{color:var(--cyan)}
+.links{display:flex;gap:18px;margin-left:auto;flex-wrap:wrap}
+.links a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:500}
+.links a:hover{color:var(--text)}
+.theme-btn{border:1px solid var(--line);background:var(--panel2);color:var(--text);font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;padding:8px 12px;cursor:pointer;min-height:36px}
+.theme-btn:hover{border-color:var(--cyan)}
+@media (max-width:760px){.links{display:none}.theme-btn{margin-left:auto}}
+
+/* hero */
+.hero{padding:64px 0 72px;border-top:none;background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:44px 44px}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+@media (max-width:900px){.hero-grid{grid-template-columns:1fr}}
+.chips{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px}
+.chip{border:1px solid var(--cyan);color:var(--cyan);border-radius:999px;padding:4px 14px;font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;letter-spacing:.06em}
+.hero .ku-title{font-family:'Noto Kufi Arabic',sans-serif;font-weight:700;font-size:clamp(26px,3.2vw,38px);color:var(--green);direction:rtl;text-align:left;margin:0 0 6px}
+.hero h1{font-size:clamp(40px,5.6vw,64px);letter-spacing:-.02em}
+.hero h1 span{color:var(--cyan)}
+.hero p.lead{font-size:19px;color:var(--muted);margin:20px 0 28px;max-width:560px}
+.btns{display:flex;gap:12px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:10px;min-height:48px;padding:0 22px;font-weight:700;text-decoration:none;border:1px solid var(--cyan)}
+.btn.primary{background:var(--cyan);color:var(--on-accent)}
+.btn.ghost{color:var(--text);background:var(--panel)}
+.btn:hover{filter:brightness(1.08)}
+.shot{position:relative;border:1px solid var(--line);background:var(--panel)}
+.shot img{display:block;width:100%;height:auto}
+.shot::before,.shot::after{content:"";position:absolute;width:26px;height:26px;border:3px solid var(--green)}
+.shot::before{left:-8px;top:-8px;border-right:none;border-bottom:none}
+.shot::after{right:-8px;bottom:-8px;border-left:none;border-top:none}
+.caption{font-size:13px;color:var(--muted);margin-top:10px}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:40px}
+@media (max-width:640px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.stat{border:1px solid var(--line);background:var(--panel);padding:16px 18px}
+.stat b{display:block;font-family:'Space Grotesk',sans-serif;font-size:34px;line-height:1;color:var(--cyan)}
+.stat span{font-size:14px;color:var(--muted)}
+
+/* features */
+.feat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media (max-width:900px){.feat{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.feat{grid-template-columns:1fr}}
+.card{background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--cyan);padding:22px}
+.card h3{font-size:21px;margin-bottom:8px}
+.card p{margin:0;color:var(--muted);font-size:15.5px}
+
+/* pipeline */
+.pipe{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;counter-reset:step}
+@media (max-width:900px){.pipe{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:520px){.pipe{grid-template-columns:1fr}}
+.step{background:var(--panel);border:1px solid var(--line);padding:20px;position:relative;display:flex;flex-direction:column;gap:6px}
+.step .n{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:13px;color:var(--cyan)}
+.step h3{font-size:20px}
+.step p{margin:0;color:var(--muted);font-size:15px;flex:1}
+.step .tool{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:12px;color:var(--text);border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.step.ai{border-color:var(--cyan);background:var(--panel2)}
+
+/* gallery */
+.gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+@media (max-width:760px){.gallery{grid-template-columns:1fr}}
+
+/* phrases */
+.phr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px}
+@media (max-width:900px){.phr{grid-template-columns:1fr}}
+.phr h3{font-size:19px;display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:3px solid var(--c)}
+.phr h3 small{margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--muted)}
+.phr h3::before{content:"";width:12px;height:12px;border-radius:6px;background:var(--c)}
+.phr ul{list-style:none;margin:0;padding:0}
+.phr li{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line);font-size:15px;color:var(--muted)}
+.phr li .ku{color:var(--text);font-size:19px;font-weight:600}
+
+/* run */
+.run{display:grid;grid-template-columns:1.2fr 1fr;gap:28px;align-items:start}
+@media (max-width:900px){.run{grid-template-columns:1fr}}
+pre{margin:0;background:var(--panel);border:1px solid var(--line);padding:20px;overflow-x:auto;font-family:'JetBrains Mono',monospace;font-size:14px;line-height:1.7;color:var(--text)}
+pre .c{color:var(--muted)}
+.keys{width:100%;border-collapse:collapse;font-size:15px}
+.keys td{border-bottom:1px solid var(--line);padding:9px 6px;vertical-align:top}
+.keys td:first-child{white-space:nowrap}
+kbd{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;border:1px solid var(--muted);padding:2px 7px;color:var(--text)}
+
+/* tech */
+.tech{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.tech div{border:1px solid var(--line);background:var(--panel);padding:14px 16px}
+.tech b{display:block;font-family:'Space Grotesk',sans-serif;font-size:18px}
+.tech span{font-size:13px;color:var(--muted)}
+
+footer{border-top:1px solid var(--line);padding:40px 0 56px;color:var(--muted);font-size:15px}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:16px}
+footer b{color:var(--text)}
+</style>
+</head>
+<body>
+<nav>
+  <div class="wrap">
+    <a class="logo" href="#top"><b>KSL</b> // TRANSLATOR</a>
+    <div class="links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#phrases">Phrases</a>
+      <a href="#run">Run it</a>
+      <a href="https://github.com/Noorhans/kurdish-sign-language-translator">GitHub</a>
+    </div>
+    <button class="theme-btn" id="themeBtn" type="button" aria-label="Switch between dark and light mode">LIGHT MODE</button>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="chips"><span class="chip">AI &amp; MACHINE LEARNING</span><span class="chip">COMPUTER VISION</span><span class="chip">ROBOTICS</span></div>
+        <p class="ku-title">وەرگێڕی زمانی ئاماژەی کوردی</p>
+        <h1>Kurdish Sign Language<br><span>AI Translator</span></h1>
+        <p class="lead">Deaf people in Kurdistan have almost no technology that understands their language. Our system watches the signer through a regular laptop webcam and turns Kurdish Sign Language into written Kurdish, in real time.</p>
+        <div class="btns">
+          <a class="btn primary" href="https://github.com/Noorhans/kurdish-sign-language-translator/archive/refs/heads/main.zip">Download the code</a>
+          <a class="btn ghost" href="https://github.com/Noorhans/kurdish-sign-language-translator">View on GitHub</a>
+        </div>
+      </div>
+      <div>
+        <div class="shot"><img src="img/app-dark.jpg" alt="The translator in dark mode: live camera on the left, the recognised Kurdish phrase as a subtitle, detected sign and transcript panels on the right." width="1280" height="720"></div>
+        <p class="caption">Interface preview. The person shown is an illustration; the app displays the real camera picture.</p>
+      </div>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>25</b><span>Kurdish phrases</span></div>
+      <div class="stat"><b>21</b><span>landmarks per hand</span></div>
+      <div class="stat"><b>≈1 s</b><span>per sign (30 frames)</span></div>
+      <div class="stat"><b>0</b><span>images saved</span></div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker">01 / On screen</span><h2>Built for anyone to use</h2><p>Walk up, raise your hands and sign. Everything works with a mouse click or a single key.</p></div>
+    <div class="feat">
+      <div class="card"><h3>Real camera view</h3><p>The signer appears exactly as the camera sees them, never cropped. Tracking runs quietly in the background.</p></div>
+      <div class="card"><h3>Live subtitles</h3><p>Each recognised sign appears on the video in Kurdish, with its English meaning, like TV captions.</p></div>
+      <div class="card"><h3>Full sentences</h3><p>Signed words build a transcript, and an AI language model turns it into one natural Sorani sentence.</p></div>
+      <div class="card"><h3>Dark &amp; light mode</h3><p>Switch themes in one click to suit the room, from a dark exhibition hall to a bright classroom.</p></div>
+      <div class="card"><h3>One-click buttons</h3><p>Sentence, undo, clear, show tracking, theme and fullscreen, all with a keyboard shortcut too.</p></div>
+      <div class="card"><h3>Private by design</h3><p>The app never stores camera images. Training data is saved only as landmark numbers.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker">02 / Behind the scenes</span><h2>From hand movement to Kurdish text</h2><p>Eight steps, every frame, on a normal laptop CPU with no GPU needed.</p></div>
+    <div class="pipe">
+      <div class="step"><span class="n">01</span><h3>Camera</h3><p>Webcam frames at about 30 per second, mirrored like a selfie.</p><span class="tool">OpenCV</span></div>
+      <div class="step"><span class="n">02</span><h3>Landmarks</h3><p>The whole body plus 21 points on each hand, every frame.</p><span class="tool">MediaPipe</span></div>
+      <div class="step"><span class="n">03</span><h3>Normalize</h3><p>Centered on the shoulders and scaled, so where you stand doesn't matter.</p><span class="tool">NumPy · 201 values / frame</span></div>
+      <div class="step"><span class="n">04</span><h3>Motion window</h3><p>The last 30 frames (about 1 second) form one movement sample.</p><span class="tool">30 × 201 matrix</span></div>
+      <div class="step ai"><span class="n">05 · AI MODEL</span><h3>Neural network</h3><p>Conv1D → 2 bidirectional GRU layers → dense layers learn each motion.</p><span class="tool">TensorFlow / Keras</span></div>
+      <div class="step"><span class="n">06</span><h3>Prediction</h3><p>A probability for each of 26 classes: the 25 phrases plus "no sign".</p><span class="tool">Softmax</span></div>
+      <div class="step"><span class="n">07</span><h3>Smoothing</h3><p>A sign is accepted only when it stays above the confidence threshold.</p><span class="tool">One sign = one word</span></div>
+      <div class="step ai"><span class="n">08 · LANGUAGE AI</span><h3>Sorani sentence</h3><p>The transcript is rewritten as one natural, grammatical sentence.</p><span class="tool">Claude API</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="screens">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker">03 / Screens</span><h2>Tracking on demand</h2><p>Press <kbd>V</kbd> to draw the AI's view of the body and hands on the video, and press it again to hide it.</p></div>
+    <div class="gallery">
+      <div><div class="shot"><img src="img/app-tracking.jpg" alt="Dark mode with tracking lines drawn over the body and both hands." width="1280" height="720" loading="lazy"></div><p class="caption">Dark mode, tracking shown.</p></div>
+      <div><div class="shot"><img src="img/app-light-tracking.jpg" alt="Light mode with tracking lines drawn over the body and both hands." width="1280" height="720" loading="lazy"></div><p class="caption">Light mode, tracking shown.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="phrases">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker">04 / Training data</span><h2>The 25 phrases it understands</h2><p>Recorded by our team, about 30 samples per phrase, then augmented with changes in speed, angle, size and jitter.</p></div>
+    <div class="phr">
+      <div style="--c:#0891B2"><h3>Questions <small>6</small></h3><ul>
+        <li>What's your name?<span class="ku">ناوت چییە؟</span></li>
+        <li>What's your sign name?<span class="ku">ناوت بە ئاماژە چییە؟</span></li>
+        <li>Where are you from?<span class="ku">خەڵکی کوێیت؟</span></li>
+        <li>Are you deaf?<span class="ku">ئایا تۆ نابیستیت؟</span></li>
+        <li>What is this?<span class="ku">ئەمە چییە؟</span></li>
+        <li>What is that?<span class="ku">ئەوە چییە؟</span></li>
+      </ul></div>
+      <div style="--c:#059669"><h3>People, places &amp; school <small>9</small></h3><ul>
+        <li>Kurdistan<span class="ku">کوردستان</span></li>
+        <li>America<span class="ku">ئەمریکا</span></li>
+        <li>Hard of hearing<span class="ku">کەمبیست</span></li>
+        <li>Hearing person<span class="ku">کەسێک کە دەبیستێت</span></li>
+        <li>Teacher<span class="ku">مامۆستا</span></li>
+        <li>Teaching<span class="ku">فێر کردن</span></li>
+        <li>Student<span class="ku">خوێندکار</span></li>
+        <li>Learning<span class="ku">فێر بوون</span></li>
+        <li>Sign language<span class="ku">زمانی ئاماژە</span></li>
+      </ul></div>
+      <div style="--c:#D97706"><h3>Time &amp; days <small>10</small></h3><ul>
+        <li>Year<span class="ku">ساڵ</span></li>
+        <li>Month<span class="ku">مانگ</span></li>
+        <li>Week<span class="ku">هەفتە</span></li>
+        <li>Day<span class="ku">ڕۆژ</span></li>
+        <li>Saturday<span class="ku">شەممە</span></li>
+        <li>Sunday<span class="ku">یەکشەممە</span></li>
+        <li>Monday<span class="ku">دووشەممە</span></li>
+        <li>Tuesday<span class="ku">سێشەممە</span></li>
+        <li>Wednesday<span class="ku">چوارشەممە</span></li>
+        <li>Thursday<span class="ku">پێنجشەممە</span></li>
+      </ul></div>
+    </div>
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker">05 / Run it</span><h2>Try it on your own laptop</h2><p>You need Python 3.10–3.12 and a webcam. See the <a href="https://github.com/Noorhans/kurdish-sign-language-translator#readme">README</a> for the full guide.</p></div>
+    <div class="run">
+<pre><span class="c"># 1. install (once)</span>
+pip install -r requirements.txt
+
+<span class="c"># 2. record samples (SPACE records 30 in a row)</span>
+python collect.py --signer yourname
+
+<span class="c"># 3. train the model</span>
+python train.py
+
+<span class="c"># 4. run the translator</span>
+python app.py
+python app.py --theme light</pre>
+      <table class="keys">
+        <tr><td><kbd>ENTER</kbd></td><td>Turn the words into a Kurdish sentence</td></tr>
+        <tr><td><kbd>BKSP</kbd></td><td>Undo the last word</td></tr>
+        <tr><td><kbd>C</kbd></td><td>Clear everything</td></tr>
+        <tr><td><kbd>V</kbd></td><td>Show or hide tracking lines</td></tr>
+        <tr><td><kbd>T</kbd></td><td>Dark or light mode</td></tr>
+        <tr><td><kbd>F</kbd></td><td>Fullscreen</td></tr>
+        <tr><td><kbd>+</kbd> <kbd>-</kbd></td><td>Sensitivity</td></tr>
+        <tr><td><kbd>Q</kbd></td><td>Quit</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="tech">
+  <div class="wrap">
+    <div class="sec-head"><span class="kicker">06 / Built with</span><h2>Tools</h2></div>
+    <div class="tech">
+      <div><b>Python</b><span>main language</span></div>
+      <div><b>OpenCV</b><span>camera &amp; display</span></div>
+      <div><b>MediaPipe</b><span>body &amp; hand tracking</span></div>
+      <div><b>TensorFlow</b><span>deep learning model</span></div>
+      <div><b>NumPy</b><span>data &amp; augmentation</span></div>
+      <div><b>Pillow + bidi</b><span>Kurdish text display</span></div>
+      <div><b>Claude API</b><span>sentence building</span></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div><b>Team:</b> Noorhan Salah Hassan · Vare Latif &nbsp;&nbsp; <b>Supervisor:</b> Dr. Jaza Faeq</div>
+    <div>Department of Computer Engineering · University of Sulaimani · 2026</div>
+    <div style="flex-basis:100%;font-size:13px">Sign references: Kurdish Sign Language lessons by HannahDeafLove (YouTube).</div>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var root = document.documentElement, btn = document.getElementById('themeBtn');
+  function apply(t) {
+    if (t === 'light') root.setAttribute('data-theme', 'light'); else root.removeAttribute('data-theme');
+    btn.textContent = t === 'light' ? 'DARK MODE' : 'LIGHT MODE';
+  }
+  var saved = null;
+  try { saved = localStorage.getItem('ksl-theme'); } catch (e) {}
+  apply(saved === 'light' ? 'light' : 'dark');
+  btn.addEventListener('click', function () {
+    var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+    apply(next);
+    try { localStorage.setItem('ksl-theme', next); } catch (e) {}
+  });
+})();
+</script>
+</body>
+</html>

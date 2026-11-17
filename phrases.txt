@@ -1,0 +1,68 @@
+# Kurdish Sign Language phrases — 25 used for the exhibition
+# One phrase per line:   id | Kurdish text (shown on screen) | English
+#  - id: English letters/numbers/underscore only (used as the folder name)
+#  - Lines starting with # are ignored.
+#  - The "idle" class (hands resting / not signing) is added automatically.
+
+# --- Video 1: KuSL class 1 -------------------------------------------------
+whats_your_name      | ناوت چییە؟              | What's your name?
+whats_your_sign_name | ناوت بە ئاماژە چییە؟    | What's your sign name?
+where_are_you_from   | خەڵکی کوێیت؟            | Where are you from?
+kurdistan            | کوردستان                | Kurdistan
+america              | ئەمریکا                 | America
+are_you_deaf         | ئایا تۆ نابیستیت؟       | Are you deaf?
+hard_of_hearing      | کەمبیست                 | Hard of hearing
+hearing_person       | کەسێک کە دەبیستێت       | Hearing person
+what_is_this         | ئەمە چییە؟              | What is this?
+what_is_that         | ئەوە چییە؟              | What is that?
+teacher              | مامۆستا                 | Teacher
+teaching             | فێر کردن                | Teaching
+student              | خوێندکار                | Student
+learning             | فێر بوون                | Learning
+sign_language        | زمانی ئاماژە            | Sign language
+year                 | ساڵ                     | Year
+month                | مانگ                    | Month
+week                 | هەفتە                   | Week
+day                  | ڕۆژ                     | Day
+saturday             | شەممە                   | Saturday
+sunday               | یەکشەممە                | Sunday
+monday               | دووشەممە                | Monday
+tuesday              | سێشەممە                 | Tuesday
+wednesday            | چوارشەممە               | Wednesday
+thursday             | پێنجشەممە               | Thursday
+
+# ===================================================================
+# NOT USED for the exhibition (not recorded). Remove the # to bring
+# a phrase back later, record it, and train again.
+# ===================================================================
+# friday               | هەینی                   | Friday
+
+# --- Video 2: Key phrases ---------------------------------------------------
+# its_hard             | قورسە                   | It's hard
+# its_easy             | ئاسانە                  | It's easy
+# again                | دووبارە                 | Again
+# again_slowly         | بێزەحمەت دووبارەی بکەرەوە بە هێواشی | Please do it again slowly
+# i_dont_know          | نازانم                  | I don't know
+# stop                 | بوەستە                  | Stop
+# finished             | تەواو                   | Finished / done
+# where                | لەکوێ                   | Where?
+
+# --- Video 3: Various signs -------------------------------------------------
+# swim                 | مەلەکردن                | Swim
+# down_syndrome        | داون سیندرۆم            | Down syndrome
+# its_okay             | ئاساییە                 | It's okay
+# wrong                | هەڵە                    | Wrong
+# lie                  | درۆ                     | Lie
+# truthful             | ڕاستگۆ                  | Truthful
+# enemy                | دوژمن                   | Enemy
+# opposite             | پێچەوانە                | Opposite
+# fault                | تاوان                   | Fault
+# all                  | هەموو                   | All
+# same                 | هەمان                   | Same
+# equal                | یەکسان                  | Equal
+# foreign              | بیانی                   | Foreign
+
+# --- Video 4: Cities (check these 3 appear in the video) --------------------
+# erbil                | هەولێر                  | Erbil
+# sulaymaniyah         | سلێمانی                 | Sulaymaniyah
+# duhok                | دهۆک                    | Duhok
